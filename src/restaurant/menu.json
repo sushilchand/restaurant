@@ -1,0 +1,9 @@
+{
+  "currency": "USD",
+  "items": [
+    {"name": "burger", "quantity": 8, "price": 12.5},
+    {"name": "fries", "quantity": 12, "price": 4.0},
+    {"name": "salad", "quantity": 6, "price": 8.75},
+    {"name": "lemonade", "quantity": 10, "price": 3.5}
+  ]
+}
