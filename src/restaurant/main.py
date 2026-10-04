@@ -15,8 +15,8 @@ from pathlib import Path
 from threading import Lock
 from typing import Annotated, Any, TypedDict
 
-from langchain_core.messages import AIMessage, AnyMessage, HumanMessage
 from groq import Groq
+from langchain_core.messages import AIMessage, AnyMessage, HumanMessage
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.message import add_messages
 
@@ -153,11 +153,16 @@ class OrderInterpreter:
         result = json.loads(content)
         if isinstance(result, dict) and result.get("valid") is False:
             raise InvalidOrderError(
-                str(result.get("reason") or "The order contains an invalid item or quantity.")
+                str(
+                    result.get("reason")
+                    or "The order contains an invalid item or quantity."
+                )
             )
         items = result.get("items") if isinstance(result, dict) else None
         if not isinstance(items, list):
-            raise ValueError("The language model response did not contain an items list")
+            raise ValueError(
+                "The language model response did not contain an items list"
+            )
         return items
 
     def _interpret_locally(self, request: str) -> list[dict[str, Any]]:
@@ -199,9 +204,34 @@ class OrderInterpreter:
                 )
 
         allowed_words = {
-            "i", "d", "would", "like", "want", "please", "give", "me", "can",
-            "could", "get", "have", "order", "to", "and", "also", "some", "a",
-            "an", "for", "of", "the", "with", "then", "that", "make", "it", "x",
+            "i",
+            "d",
+            "would",
+            "like",
+            "want",
+            "please",
+            "give",
+            "me",
+            "can",
+            "could",
+            "get",
+            "have",
+            "order",
+            "to",
+            "and",
+            "also",
+            "some",
+            "a",
+            "an",
+            "for",
+            "of",
+            "the",
+            "with",
+            "then",
+            "that",
+            "make",
+            "it",
+            "x",
             *quantity_words,
         }
         unknown_items = sorted(
@@ -217,7 +247,9 @@ class OrderInterpreter:
             )
 
         lines: list[dict[str, Any]] = []
-        for item, name in sorted(item_patterns, key=lambda pair: len(pair[0].name), reverse=True):
+        for item, name in sorted(
+            item_patterns, key=lambda pair: len(pair[0].name), reverse=True
+        ):
             numeric_before = re.search(
                 rf"\b(\d+)\s*(?:x\s*)?{name}\b", request, re.IGNORECASE
             )
@@ -237,7 +269,10 @@ class OrderInterpreter:
             elif word_before or word_after:
                 word_match = word_before or word_after
                 lines.append(
-                    {"name": item.name, "quantity": quantity_words[word_match.group(1).casefold()]}
+                    {
+                        "name": item.name,
+                        "quantity": quantity_words[word_match.group(1).casefold()],
+                    }
                 )
             elif re.search(rf"\b{name}\b", request, re.IGNORECASE):
                 lines.append({"name": item.name, "quantity": 1})
@@ -265,7 +300,9 @@ class RestaurantWorkflow:
         self.menu = MenuCatalog(menu_path or default_menu)
         effective_api_key = GROQ_API_KEY if api_key is None else api_key
         effective_model = model or LLM_MODEL_NAME or DEFAULT_MODEL
-        self.interpreter = OrderInterpreter(self.menu, effective_api_key, effective_model)
+        self.interpreter = OrderInterpreter(
+            self.menu, effective_api_key, effective_model
+        )
         self.max_attempts = max_attempts
         self.base_delay = base_delay
         self.sleeper = sleeper
@@ -277,7 +314,9 @@ class RestaurantWorkflow:
         graph.add_node("cook", self.cook)
         graph.add_node("serve", self.serve)
         graph.add_node("refund", self.refund)
-        graph.add_node("recommend_another_restaurant", self.recommend_another_restaurant)
+        graph.add_node(
+            "recommend_another_restaurant", self.recommend_another_restaurant
+        )
         graph.add_node("billing", self.billing)
         graph.add_edge(START, "confirm_order")
         graph.add_conditional_edges(
@@ -340,7 +379,9 @@ class RestaurantWorkflow:
         raise RuntimeError(f"{stage} failed without an exception")
 
     @staticmethod
-    def _next_node(state: RestaurantState, node: str, **updates: Any) -> RestaurantState:
+    def _next_node(
+        state: RestaurantState, node: str, **updates: Any
+    ) -> RestaurantState:
         completed = [*state.get("completed_nodes", []), node]
         message = updates.get("customer_message")
         if isinstance(message, str) and message:
@@ -396,11 +437,16 @@ class RestaurantWorkflow:
                 or quantity < 1
             ):
                 return self._invalid_order(state, counts)
-            normalized.append({"name": self.menu.items[name].name, "quantity": quantity})
+            normalized.append(
+                {"name": self.menu.items[name].name, "quantity": quantity}
+            )
 
         shortages = self.menu.reserve(normalized)
         if shortages:
-            details = ", ".join(f"{name}: {available} available" for name, available in shortages.items())
+            details = ", ".join(
+                f"{name}: {available} available"
+                for name, available in shortages.items()
+            )
             return self._next_node(
                 state,
                 "confirm_order",
@@ -490,7 +536,9 @@ class RestaurantWorkflow:
                 ),
                 cook_failures=failures,
                 last_error=str(error),
-                refund_amount=state.get("total") if not retry else state.get("refund_amount"),
+                refund_amount=(
+                    state.get("total") if not retry else state.get("refund_amount")
+                ),
                 customer_message=(
                     "The kitchen had a problem. Retrying preparation."
                     if retry
@@ -527,7 +575,9 @@ class RestaurantWorkflow:
                 status="serve_retry" if retry else "serve_failed",
                 order_status="partially_completed",
                 serve_failures=failures,
-                refund_amount=state.get("total") if not retry else state.get("refund_amount"),
+                refund_amount=(
+                    state.get("total") if not retry else state.get("refund_amount")
+                ),
                 last_error=str(error),
                 customer_message=(
                     "We could not serve the order. We will prepare it again and retry service."
@@ -563,7 +613,9 @@ class RestaurantWorkflow:
                     "refund", lambda: refund_handler(amount), counts
                 )
                 refund_record.update(status="refunded", result=str(result))
-                message = f"A refund of {self.menu.currency} {amount} has been processed."
+                message = (
+                    f"A refund of {self.menu.currency} {amount} has been processed."
+                )
             except Exception as error:
                 refund_record.update(status="refund_failed", error=str(error))
                 message = (

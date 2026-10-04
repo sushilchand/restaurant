@@ -110,7 +110,10 @@ class RestaurantWorkflowTests(unittest.TestCase):
         workflow.interpreter.interpret("Then make it 2.", history)
 
         self.assertEqual(
-            [(message["role"], message["content"]) for message in captured["messages"][1:]],
+            [
+                (message["role"], message["content"])
+                for message in captured["messages"][1:]
+            ],
             [
                 ("user", "99 burgers"),
                 ("assistant", "Only 8 burgers are available."),
